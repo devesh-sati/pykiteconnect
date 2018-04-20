@@ -497,7 +497,7 @@ class KiteTicker(object):
     def _user_agent(self):
         return (__title__ + "-python/").capitalize() + __version__
 
-    def connect(self, threaded=False, disable_ssl_verification=False, proxy=None):
+    def connect(self, threaded=False, disable_ssl_verification=False, proxy=None, signal_handlers=True):
         """
         Establish a websocket connection.
 
@@ -531,6 +531,8 @@ class KiteTicker(object):
 
         # Run when reactor is not running
         if not reactor.running:
+            if not signal_handlers:
+                opts["installSignalHandlers"] = False
             if threaded:
                 # Signals are not allowed in non main thread by twisted so suppress it.
                 opts["installSignalHandlers"] = False
