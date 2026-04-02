@@ -176,7 +176,8 @@ class KiteConnect(object):
                  timeout=None,
                  proxies=None,
                  pool=None,
-                 disable_ssl=False):
+                 disable_ssl=False,
+                 rate_limiter=None):
         """
         Initialise a new Kite Connect client instance.
 
@@ -198,6 +199,10 @@ class KiteConnect(object):
         - `pool` is manages request pools. It takes a dict of params accepted by HTTPAdapter as described here in [python requests documentation](http://docs.python-requests.org/en/master/api/#requests.adapters.HTTPAdapter)
         - `disable_ssl` disables the SSL verification while making a request.
         If set requests won't throw SSLError if its set to custom `root` url without SSL.
+        - `rate_limiter` is an optional :class:`~kiteconnect.redis_rate_limiter.RedisRateLimiter`
+        instance (or any object implementing ``acquire()``, ``record_success()``,
+        ``record_failure()``, and ``record_429()``).  When supplied every outgoing
+        request is throttled through the circuit breaker shared across all processes.
         """
         self.debug = debug
         self.api_key = api_key
@@ -215,6 +220,9 @@ class KiteConnect(object):
         if pool:
             reqadapter = requests.adapters.HTTPAdapter(**pool)
             self.reqsession.mount("https://", reqadapter)
+
+        # Optional cross-process circuit breaker / rate limiter
+        self._rate_limiter = rate_limiter
 
         # disable requests SSL warning
         requests.packages.urllib3.disable_warnings()
@@ -911,6 +919,11 @@ class KiteConnect(object):
         if method in ["GET", "DELETE"]:
             query_params = params
 
+        # Block here if the circuit is OPEN or the token bucket is empty.
+        # acquire() returns only when this process is allowed to proceed.
+        if self._rate_limiter:
+            self._rate_limiter.acquire()
+
         try:
             r = self.reqsession.request(method,
                                         url,
@@ -924,10 +937,21 @@ class KiteConnect(object):
                                         proxies=self.proxies)
         # Any requests lib related exceptions are raised here - https://requests.readthedocs.io/en/latest/api/#exceptions
         except Exception as e:
+            if self._rate_limiter:
+                self._rate_limiter.record_failure()
             raise e
 
         if self.debug:
             log.debug("Response: {code} {content}".format(code=r.status_code, content=r.content))
+
+        # ---- Circuit breaker feedback ----
+        if self._rate_limiter:
+            if r.status_code == 429:
+                self._rate_limiter.record_429()
+            elif r.status_code >= 500:
+                self._rate_limiter.record_failure()
+            elif r.status_code < 400:
+                self._rate_limiter.record_success()
 
         # Validate the content type.
         if "json" in r.headers["content-type"]:

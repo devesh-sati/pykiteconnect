@@ -111,5 +111,6 @@ from __future__ import unicode_literals, absolute_import
 from kiteconnect import exceptions
 from kiteconnect.connect import KiteConnect
 from kiteconnect.ticker import KiteTicker
+from kiteconnect.redis_rate_limiter import RedisRateLimiter
 
-__all__ = ["KiteConnect", "KiteTicker", "exceptions"]
+__all__ = ["KiteConnect", "KiteTicker", "RedisRateLimiter", "exceptions"]
