@@ -873,7 +873,7 @@ class KiteConnect(object):
         return records
 
     def _user_agent(self):
-        return (__title__ + "-python/").capitalize() + __version__
+        return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
     def _get(self, route, url_args=None, params=None, is_json=False):
         """Alias for sending a GET request."""
