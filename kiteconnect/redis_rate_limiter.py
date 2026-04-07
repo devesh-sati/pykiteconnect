@@ -191,7 +191,7 @@ class RedisRateLimiter:
             # ── OPEN: block for the remaining cooldown ─────────────────
             if state == CB_OPEN:
                 ttl = self._redis.ttl(self._open_key)
-                if ttl > 0:
+                if isinstance(ttl, (int, float)) and ttl > 0:
                     log.warning(
                         "Circuit OPEN (api_key=%s). All processes blocked "
                         "for %.0fs.",
